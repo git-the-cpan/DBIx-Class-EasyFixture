@@ -1,5 +1,5 @@
 package DBIx::Class::EasyFixture::Definition;
-$DBIx::Class::EasyFixture::Definition::VERSION = '0.11';
+$DBIx::Class::EasyFixture::Definition::VERSION = '0.12';
 # ABSTRACT: Validate fixture definitions
 
 use Moose;
@@ -89,7 +89,28 @@ sub BUILD {
 sub resultset_class  { shift->definition->{new} }
 sub constructor_data { shift->definition->{using} }
 sub next             { shift->definition->{next} }
+# used only internally to validate the fixture definitions
 sub requires         { shift->definition->{requires} }
+# returns all requires configs which are not marked as `deferred`
+sub requires_pre {
+    my $self = shift;
+    my $requires = {};
+    REQUIRES: while( my ($parent, $methods) = each( %{ $self->definition->{requires} } ) ) {
+        next REQUIRES if($methods->{deferred});
+        $requires->{$parent} = $methods;
+    }
+    return $requires;
+}
+# returns all requires configs which are marked as `deferred`
+sub requires_defer {
+    my $self = shift;
+    my $deferred = {};
+    DEFERRED: while( my ($parent, $methods) = each( %{ $self->definition->{requires} } ) ) {
+        next DEFERRED unless($methods->{deferred});
+        $deferred->{$parent} = $methods;
+    }
+    return $deferred;
+}
 
 sub _validate_group {
     my $self  = shift;
@@ -176,7 +197,7 @@ sub _validate_required_objects {
               = { our => $methods, their => $methods };
             next;
         }
-        if ( my @bad_keys = grep { !/^(?:our|their)$/ } keys %$methods ) {
+        if ( my @bad_keys = grep { !/^(?:our|their|deferred)$/ } keys %$methods ) {
             croak("'$name' had bad keys: @bad_keys");
         }
         unless ( exists $methods->{our} ) {
@@ -204,7 +225,7 @@ DBIx::Class::EasyFixture::Definition - Validate fixture definitions
 
 =head1 VERSION
 
-version 0.11
+version 0.12
 
 =head2 DESCRIPTION
 
